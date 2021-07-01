@@ -5,13 +5,14 @@ import (
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/lambda"
 	sns2 "github.com/pulumi/pulumi-aws/sdk/v4/go/aws/sns"
+	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/sqs"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"os"
 )
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
-		//create a event rule triggers sns topic every 5 minutes
+		// Create a event rule triggers sns topic every 5 minutes
 		scheduleRule, err := cloudwatch.NewEventRule(ctx, "pulumi-aws-demo-schedule-rule", &cloudwatch.EventRuleArgs{
 			Description:  pulumi.String("Trigger pulumi-aws-demo-main-sns every 5 minutes"),
 			ScheduleExpression:  pulumi.String("rate(5 minutes)"),
@@ -19,12 +20,13 @@ func main() {
 		if err != nil {
 			return err
 		}
+
 		// Create an AWS resource (SNS:Topic)
 		mainSns, err := sns2.NewTopic(ctx,"pulumi-aws-demo-main-sns",nil)
 		if err != nil {
 			return err
 		}
-		//Link event rule to trigger sns
+		// Link event rule to trigger sns
 		_, err = cloudwatch.NewEventTarget(ctx, "pulumi-aws-demo-target-main-sns", &cloudwatch.EventTargetArgs{
 			Rule: scheduleRule.Name,
 			Arn:  mainSns.Arn,
@@ -32,7 +34,19 @@ func main() {
 		if err != nil {
 			return err
 		}
-		//create a lambda function recording event to log
+
+		// Create a SQS to consume SNS & trigger lambda function
+		sqs, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
+			ContentBasedDeduplication: pulumi.Bool(true),
+			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
+			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
+			FifoQueue:                 pulumi.Bool(true),
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create a lambda function recording event to log
 		lambdaRole, err := iam.NewRole(ctx,"pulumi-aws-demo-lambda-exec-role",&iam.RoleArgs{
 			AssumeRolePolicy: pulumi.String(`{
 				"Version": "2012-10-17",
@@ -96,8 +110,16 @@ func main() {
 			return err
 		}
 
-		//create subscriptions for mainSns
-		//Send email
+		_, err = lambda.NewEventSourceMapping(ctx, "pulumi-aws-demo-lambda-sqs-event", &lambda.EventSourceMappingArgs{
+			EventSourceArn: sqs.Arn,
+			FunctionName:   lambdaFunction.Name,
+		})
+		if err != nil {
+			return err
+		}
+
+		// Create subscriptions for mainSns
+		// Send email
 		//_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-email-sub", &sns2.TopicSubscriptionArgs{
 		//	Topic: mainSns,
 		//	Endpoint: pulumi.String(os.Getenv("MY_EMAIL_ADDRESS")),
@@ -107,7 +129,7 @@ func main() {
 		//	return err
 		//}
 
-		//Trigger lambda
+		// Trigger lambda
 		_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-lambda-sub", &sns2.TopicSubscriptionArgs{
 			Topic: mainSns,
 			Endpoint: lambdaFunction.Arn,
@@ -116,6 +138,17 @@ func main() {
 		if err != nil {
 			return err
 		}
+
+		// Sqs consume
+		_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-sqs-sub", &sns2.TopicSubscriptionArgs{
+			Topic: mainSns,
+			Endpoint: sqs.Arn,
+			Protocol: pulumi.String("sqs"),
+		})
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 }
