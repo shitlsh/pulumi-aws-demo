@@ -76,7 +76,15 @@ func main() {
                         "logs:PutLogEvents"
                     ],
                     "Resource": "arn:aws:logs:*:*:*"
-                }]
+                },
+				{
+					"Sid": "",
+					"Effect": "Allow",
+					"Action": [
+						"sqs:ReceiveMessage"
+					],
+					"Resource": "*"
+				}]
             }`),
 		})
 
