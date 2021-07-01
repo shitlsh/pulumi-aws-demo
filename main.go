@@ -83,7 +83,7 @@ func main() {
 		}
 
 		// Create the lambda using the args.
-		_, err = lambda.NewFunction(
+		lambdaFunction, err := lambda.NewFunction(
 			ctx,
 			"pulumi-aws-demo-lambda-function",
 			functionArgs,
@@ -97,11 +97,25 @@ func main() {
 		}
 
 		//create subscriptions for mainSns
-		_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-email-sub", &sns2.TopicSubscriptionArgs{
+		//Send email
+		//_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-email-sub", &sns2.TopicSubscriptionArgs{
+		//	Topic: mainSns,
+		//	Endpoint: pulumi.String(os.Getenv("MY_EMAIL_ADDRESS")),
+		//	Protocol: pulumi.String("email"),
+		//})
+		//if err != nil {
+		//	return err
+		//}
+
+		//Trigger lambda
+		_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-lambda-sub", &sns2.TopicSubscriptionArgs{
 			Topic: mainSns,
-			Endpoint: pulumi.String(os.Getenv("MY_EMAIL_ADDRESS")),
-			Protocol: pulumi.String("email"),
+			Endpoint: lambdaFunction.Arn,
+			Protocol: pulumi.String("lambda"),
 		})
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 }
