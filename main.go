@@ -35,6 +35,24 @@ func main() {
 			return err
 		}
 
+
+		_, err = sns2.NewTopicPolicy(ctx, "_default", &sns2.TopicPolicyArgs{
+			Arn: mainSns.Arn,
+			Policy: pulumi.String(`{
+				"Version": "2012-10-17",
+				"Statement": [{
+					"Effect": "Allow",
+					"Principal": {
+						"Service": "events.amazonaws.com"
+					},
+					"Action": "sns:Publish"
+				}]
+			}`),
+		})
+		if err != nil {
+			return err
+		}
+
 		// Create a SQS to consume SNS & trigger lambda function
 		sqs, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
 			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
