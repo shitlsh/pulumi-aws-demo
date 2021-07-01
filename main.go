@@ -37,10 +37,8 @@ func main() {
 
 		// Create a SQS to consume SNS & trigger lambda function
 		sqs, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
-			ContentBasedDeduplication: pulumi.Bool(true),
 			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
 			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
-			FifoQueue:                 pulumi.Bool(true),
 		})
 		if err != nil {
 			return err
