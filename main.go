@@ -75,7 +75,7 @@ func main() {
 		//})
 
 		// Attach a policy to allow writing logs to CloudWatch
-		logPolicy, err := iam.NewRolePolicy(ctx, "pulumi-aws-demo-lambda-log--policy", &iam.RolePolicyArgs{
+		logPolicy, err := iam.NewRolePolicy(ctx, "pulumi-aws-demo-lambda-log-policy", &iam.RolePolicyArgs{
 			Role: lambdaRole.Name,
 			Policy: pulumi.String(`{
                 "Version": "2012-10-17",
@@ -94,7 +94,7 @@ func main() {
 					"Action": [
 						"sqs:ReceiveMessage",
 						"sqs:DeleteMessage",
-						"sqs:GetQueueAttributes",
+						"sqs:GetQueueAttributes"
 					],
 					"Resource": "*"
 				}]
