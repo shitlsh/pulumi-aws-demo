@@ -63,6 +63,17 @@ func main() {
 			return err
 		}
 
+		//tmpJSON, err := json.Marshal(map[string]interface{}{
+		//	"Version": "2012-10-17",
+		//	"Statement": []map[string]interface{}{
+		//		{
+		//			"Effect":    "Allow",
+		//			"Action":    []string{"s3:GetObject"},
+		//			"Resource":  []string{pulumi.},
+		//		},
+		//	},
+		//})
+
 		// Attach a policy to allow writing logs to CloudWatch
 		logPolicy, err := iam.NewRolePolicy(ctx, "pulumi-aws-demo-lambda-log--policy", &iam.RolePolicyArgs{
 			Role: lambdaRole.Name,
@@ -76,7 +87,17 @@ func main() {
                         "logs:PutLogEvents"
                     ],
                     "Resource": "arn:aws:logs:*:*:*"
-                }]
+                },
+				{
+					"Sid": "",
+					"Effect": "Allow",
+					"Action": [
+						"sqs:ReceiveMessage",
+						"sqs:DeleteMessage",
+						"sqs:GetQueueAttributes",
+					],
+					"Resource": "*"
+				}]
             }`),
 		})
 
