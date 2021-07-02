@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/cloudwatch"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/lambda"
@@ -22,10 +23,13 @@ func main() {
 		}
 
 		// Create an AWS resource (SNS:Topic)
-		mainSns, err := sns2.NewTopic(ctx,"pulumi-aws-demo-main-sns",nil)
+		mainSns, err := sns2.NewTopic(ctx,"pulumi-aws-demo-main-sns",&sns2.TopicArgs{
+			Name: pulumi.String("pulumi-aws-demo-main-sns"),
+		})
 		if err != nil {
 			return err
 		}
+
 		// Link event rule to trigger sns
 		_, err = cloudwatch.NewEventTarget(ctx, "pulumi-aws-demo-target-main-sns", &cloudwatch.EventTargetArgs{
 			Rule: scheduleRule.Name,
@@ -34,7 +38,6 @@ func main() {
 		if err != nil {
 			return err
 		}
-
 
 		_, err = sns2.NewTopicPolicy(ctx, "_default", &sns2.TopicPolicyArgs{
 			Arn: mainSns.Arn,
@@ -55,9 +58,29 @@ func main() {
 		}
 
 		// Create a SQS to consume SNS & trigger lambda function
+		deadQueue, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs-dead-letter", &sqs.QueueArgs{
+			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
+			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
+		})
+		if err != nil {
+			return err
+		}
+
+		redrivePolicy := deadQueue.Arn.ApplyT(func (arn string) (string, error) {
+			policyJSON, err := json.Marshal(map[string]interface{}{
+				"deadLetterTargetArn": arn,
+				"maxReceiveCount": 10,
+			})
+			if err != nil {
+				return "", err
+			}
+			return string(policyJSON), nil
+		}).(pulumi.StringOutput)
+
 		queue, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
 			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
 			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
+			RedrivePolicy: redrivePolicy,
 		})
 		if err != nil {
 			return err
@@ -77,6 +100,7 @@ func main() {
 				}]
 			}`),
 		})
+
 
 		// Create a lambda function recording event to log
 		lambdaRole, err := iam.NewRole(ctx,"pulumi-aws-demo-lambda-exec-role",&iam.RoleArgs{
@@ -128,18 +152,29 @@ func main() {
 					"Action": [
 						"sqs:ReceiveMessage",
 						"sqs:DeleteMessage",
-						"sqs:GetQueueAttributes"
+						"sqs:GetQueueAttributes",
+						"sqs:GetQueueUrl",
+						"sqs:SendQueue"
 					],
 					"Resource": "*"
 				}]
             }`),
 		})
 
+		// Create dead letter queue for lambda
+		deadLambda, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs-lambda-dead-letter", &sqs.QueueArgs{
+			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
+			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
+		})
+		if err != nil {
+			return err
+		}
 		// Set arguments for constructing the function resource.
 		functionArgs := &lambda.FunctionArgs{
 			Role:    lambdaRole.Arn,
 			PackageType: pulumi.String("Image"),
 			ImageUri: pulumi.String(os.Getenv("IMAGE_URI")),
+			DeadLetterConfig: &lambda.FunctionDeadLetterConfigArgs{TargetArn: deadLambda.Arn},
 		}
 
 		// Create the lambda using the args.
