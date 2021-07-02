@@ -135,13 +135,6 @@ func main() {
             }`),
 		})
 
-		logGroup, err := cloudwatch.NewLogGroup(ctx, "pulumi-aws-demo-lambda-log-group", &cloudwatch.LogGroupArgs{
-			RetentionInDays: pulumi.Int(14),
-		})
-		if err != nil {
-			return err
-		}
-
 		// Set arguments for constructing the function resource.
 		functionArgs := &lambda.FunctionArgs{
 			Role:    lambdaRole.Arn,
@@ -156,7 +149,6 @@ func main() {
 			functionArgs,
 			pulumi.DependsOn([]pulumi.Resource{
 				logPolicy,
-				logGroup,
 			}),
 		)
 		if err != nil {
