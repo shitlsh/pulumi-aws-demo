@@ -55,13 +55,28 @@ func main() {
 		}
 
 		// Create a SQS to consume SNS & trigger lambda function
-		sqs, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
+		queue, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
 			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
 			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
 		})
 		if err != nil {
 			return err
 		}
+
+		_, err = sqs.NewQueuePolicy(ctx,"_default", &sqs.QueuePolicyArgs{
+			QueueUrl: queue.Url,
+			Policy: pulumi.String(`{
+				"Version": "2012-10-17",
+				"Statement": [{
+					"Effect": "Allow",
+					"Principal": {
+						"Service": "sns.amazonaws.com"
+					},
+					"Action": "sqs:SendMessage",
+					"Resource": "*"
+				}]
+			}`),
+		})
 
 		// Create a lambda function recording event to log
 		lambdaRole, err := iam.NewRole(ctx,"pulumi-aws-demo-lambda-exec-role",&iam.RoleArgs{
@@ -149,12 +164,19 @@ func main() {
 		}
 
 		_, err = lambda.NewEventSourceMapping(ctx, "pulumi-aws-demo-lambda-sqs-event", &lambda.EventSourceMappingArgs{
-			EventSourceArn: sqs.Arn,
+			EventSourceArn: queue.Arn,
 			FunctionName:   lambdaFunction.Name,
 		})
 		if err != nil {
 			return err
 		}
+
+		_, err = lambda.NewPermission(ctx, "pulumi-aws-demo-lambda-sns-permission", &lambda.PermissionArgs{
+			Action:            pulumi.String("lambda:InvokeFunction"),
+			Function:          lambdaFunction,
+			Principal:         pulumi.String("sns.amazonaws.com"),
+			SourceArn:         mainSns.Arn,
+		})
 
 		// Create subscriptions for mainSns
 		// Send email
@@ -179,8 +201,8 @@ func main() {
 
 		// Sqs consume
 		_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-sqs-sub", &sns2.TopicSubscriptionArgs{
-			Topic: mainSns,
-			Endpoint: sqs.Arn,
+			Topic:    mainSns,
+			Endpoint: queue.Arn,
 			Protocol: pulumi.String("sqs"),
 		})
 		if err != nil {
