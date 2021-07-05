@@ -58,7 +58,7 @@ func main() {
 								"Service": "events.amazonaws.com",
 						},
 						"Action": "sns:Publish",
-						"Resource": arn,
+						"Resource": "*",
 					},
 				},
 			})
