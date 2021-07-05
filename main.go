@@ -48,7 +48,7 @@ func main() {
 		}
 
 		// Allow scheduleRule to publish to sns
-		topicPolicy := scheduleRule.Arn.ApplyT(func (arn string) (string, error) {
+		topicPolicy := mainSns.Arn.ApplyT(func (arn string) (string, error) {
 			policyJSON, err := json.Marshal(map[string]interface{}{
 				"Version": "2012-10-17",
 				"Statement": []interface{}{
@@ -58,7 +58,7 @@ func main() {
 								"Service": "events.amazonaws.com",
 						},
 						"Action": "sns:Publish",
-						"Resource": "*",
+						"Resource": arn,
 					},
 				},
 			})
