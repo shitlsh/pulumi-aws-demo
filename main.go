@@ -25,6 +25,7 @@ func main() {
 		// Create an AWS resource (SNS:Topic)
 		mainSns, err := sns2.NewTopic(ctx,"pulumi-aws-demo-main-sns",&sns2.TopicArgs{
 			Name: pulumi.String("pulumi-aws-demo-main-sns"),
+			Tags: pulumi.StringMap{"Owner": pulumi.String("awstraining")},
 		})
 		if err != nil {
 			return err
@@ -39,19 +40,32 @@ func main() {
 			return err
 		}
 
+		// Allow scheduleRule to publish to sns
+		topicPolicy := scheduleRule.Arn.ApplyT(func (arn string) (string, error) {
+			policyJSON, err := json.Marshal(map[string]interface{}{
+				"Version": "2012-10-17",
+				"Statement": []interface{}{
+					map[string]interface{}{
+						"Effect": "Allow",
+						"Principal": []interface{}{
+							map[string]interface{}{
+								"Service": "events.amazonaws.com",
+							},
+						},
+						"Action": "sns:Publish",
+						"Resource": arn,
+					},
+				},
+			})
+			if err != nil {
+				return "", err
+			}
+			return string(policyJSON), nil
+		}).(pulumi.StringOutput)
+
 		_, err = sns2.NewTopicPolicy(ctx, "_default", &sns2.TopicPolicyArgs{
 			Arn: mainSns.Arn,
-			Policy: pulumi.String(`{
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Effect": "Allow",
-					"Principal": {
-						"Service": "events.amazonaws.com"
-					},
-					"Action": "sns:Publish",
-					"Resource": "*"
-				}]
-			}`),
+			Policy: topicPolicy,
 		})
 		if err != nil {
 			return err
@@ -66,7 +80,7 @@ func main() {
 			return err
 		}
 
-		redrivePolicy := deadQueue.Arn.ApplyT(func (arn string) (string, error) {
+		retrievePolicy := deadQueue.Arn.ApplyT(func (arn string) (string, error) {
 			policyJSON, err := json.Marshal(map[string]interface{}{
 				"deadLetterTargetArn": arn,
 				"maxReceiveCount": 10,
@@ -78,9 +92,9 @@ func main() {
 		}).(pulumi.StringOutput)
 
 		queue, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
-			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
-			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
-			RedrivePolicy: redrivePolicy,
+			MessageRetentionSeconds:  pulumi.Int(7*24*60*60), //retain 7 days
+			VisibilityTimeoutSeconds: pulumi.Int(3000), //timeout 5 minutes
+			RedrivePolicy:            retrievePolicy,
 		})
 		if err != nil {
 			return err
@@ -120,17 +134,6 @@ func main() {
 		if err != nil {
 			return err
 		}
-
-		//tmpJSON, err := json.Marshal(map[string]interface{}{
-		//	"Version": "2012-10-17",
-		//	"Statement": []map[string]interface{}{
-		//		{
-		//			"Effect":    "Allow",
-		//			"Action":    []string{"s3:GetObject"},
-		//			"Resource":  []string{pulumi.},
-		//		},
-		//	},
-		//})
 
 		// Attach a policy to allow writing logs to CloudWatch
 		logPolicy, err := iam.NewRolePolicy(ctx, "pulumi-aws-demo-lambda-log-policy", &iam.RolePolicyArgs{
