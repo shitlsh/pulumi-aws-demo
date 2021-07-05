@@ -167,7 +167,7 @@ func main() {
                         "logs:CreateLogStream",
                         "logs:PutLogEvents"
                     ],
-                    "Resource": "arn:aws:logs:ap-southeast-2:%s:/aws/lambda/pulumi-aws-demo-lambda-function"
+                    "Resource": "arn:aws:logs:*:*:*"
                 },
 				{
 					"Sid": "",
@@ -184,7 +184,7 @@ func main() {
 						"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs-lambda-dead-letter"
 					]
 				}]
-            }`, callerIdentity.AccountId, callerIdentity.AccountId, callerIdentity.AccountId)),
+            }`, callerIdentity.AccountId, callerIdentity.AccountId)),
 		})
 
 		// Create dead letter queue for lambda
