@@ -100,19 +100,32 @@ func main() {
 			return err
 		}
 
+		// Allow sns to SendMessage to sqs
+		queuePolicy := mainSns.Arn.ApplyT(func (arn string) (string, error) {
+			policyJSON, err := json.Marshal(map[string]interface{}{
+				"Version": "2012-10-17",
+				"Statement": []interface{}{
+					map[string]interface{}{
+						"Effect": "Allow",
+						"Principal": []interface{}{
+							map[string]interface{}{
+								"Service": "sns.amazonaws.com",
+							},
+						},
+						"Action": "sqs:SendMessage",
+						"Resource": arn,
+					},
+				},
+			})
+			if err != nil {
+				return "", err
+			}
+			return string(policyJSON), nil
+		}).(pulumi.StringOutput)
+
 		_, err = sqs.NewQueuePolicy(ctx,"_default", &sqs.QueuePolicyArgs{
 			QueueUrl: queue.Url,
-			Policy: pulumi.String(`{
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Effect": "Allow",
-					"Principal": {
-						"Service": "sns.amazonaws.com"
-					},
-					"Action": "sqs:SendMessage",
-					"Resource": "*"
-				}]
-			}`),
+			Policy: queuePolicy,
 		})
 
 
