@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/cloudwatch"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/lambda"
@@ -13,6 +15,11 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
+		// GetCurrentAccount
+		callerIdentity, err := aws.GetCallerIdentity(ctx)
+		if err != nil {
+			return err
+		}
 		// Create a event rule triggers sns topic every 5 minutes
 		scheduleRule, err := cloudwatch.NewEventRule(ctx, "pulumi-aws-demo-schedule-rule", &cloudwatch.EventRuleArgs{
 			Description:  pulumi.String("Trigger pulumi-aws-demo-main-sns every 5 minutes"),
@@ -73,6 +80,7 @@ func main() {
 
 		// Create a SQS to consume SNS & trigger lambda function
 		deadQueue, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs-dead-letter", &sqs.QueueArgs{
+			Name: pulumi.String("pulumi-aws-demo-sqs-dead-letter"),
 			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
 			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
 		})
@@ -92,6 +100,7 @@ func main() {
 		}).(pulumi.StringOutput)
 
 		queue, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs", &sqs.QueueArgs{
+			Name: pulumi.String("pulumi-aws-demo-sqs"),
 			MessageRetentionSeconds:  pulumi.Int(7*24*60*60), //retain 7 days
 			VisibilityTimeoutSeconds: pulumi.Int(3000), //timeout 5 minutes
 			RedrivePolicy:            retrievePolicy,
@@ -143,15 +152,16 @@ func main() {
 				}]
 			}`),
 			Description:  pulumi.String("lambda exec role"),
+			Name: pulumi.String("pulumi-aws-demo-lambda-exec-role"),
 		})
 		if err != nil {
 			return err
 		}
 
 		// Attach a policy to allow writing logs to CloudWatch
-		logPolicy, err := iam.NewRolePolicy(ctx, "pulumi-aws-demo-lambda-log-policy", &iam.RolePolicyArgs{
+		lambdaRolePolicy, err := iam.NewRolePolicy(ctx, "pulumi-aws-demo-lambda-log-policy", &iam.RolePolicyArgs{
 			Role: lambdaRole.Name,
-			Policy: pulumi.String(`{
+			Policy: pulumi.String(fmt.Sprintf(`{
                 "Version": "2012-10-17",
                 "Statement": [{
                     "Effect": "Allow",
@@ -160,7 +170,7 @@ func main() {
                         "logs:CreateLogStream",
                         "logs:PutLogEvents"
                     ],
-                    "Resource": "arn:aws:logs:*:*:*"
+                    "Resource": "arn:aws:logs:ap-southeast-2:%s:/aws/lambda/pulumi-aws-demo-lambda-function"
                 },
 				{
 					"Sid": "",
@@ -172,13 +182,17 @@ func main() {
 						"sqs:GetQueueUrl",
 						"sqs:SendMessage"
 					],
-					"Resource": "*"
+					"Resource": [
+						"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs",
+						"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs-lambda-dead-letter"
+					]
 				}]
-            }`),
+            }`, callerIdentity.AccountId, callerIdentity.AccountId, callerIdentity.AccountId)),
 		})
 
 		// Create dead letter queue for lambda
 		deadLambda, err := sqs.NewQueue(ctx, "pulumi-aws-demo-sqs-lambda-dead-letter", &sqs.QueueArgs{
+			Name: pulumi.String("pulumi-aws-demo-sqs-lambda-dead-letter"),
 			MessageRetentionSeconds:   pulumi.Int(7*24*60*60), //retain 7 days
 			VisibilityTimeoutSeconds:  pulumi.Int(3000), //timeout 5 minutes
 		})
@@ -187,6 +201,7 @@ func main() {
 		}
 		// Set arguments for constructing the function resource.
 		functionArgs := &lambda.FunctionArgs{
+			Name: pulumi.String("pulumi-aws-demo-lambda-function"),
 			Role:    lambdaRole.Arn,
 			PackageType: pulumi.String("Image"),
 			ImageUri: pulumi.String(os.Getenv("IMAGE_URI")),
@@ -199,7 +214,7 @@ func main() {
 			"pulumi-aws-demo-lambda-function",
 			functionArgs,
 			pulumi.DependsOn([]pulumi.Resource{
-				logPolicy,
+				lambdaRolePolicy,
 			}),
 		)
 		if err != nil {
