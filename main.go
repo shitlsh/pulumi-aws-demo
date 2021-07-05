@@ -109,7 +109,7 @@ func main() {
 		}
 
 		// Allow sns to SendMessage to sqs
-		queuePolicy := mainSns.Arn.ApplyT(func (arn string) (string, error) {
+		queuePolicy := queue.Arn.ApplyT(func (arn string) (string, error) {
 			policyJSON, err := json.Marshal(map[string]interface{}{
 				"Version": "2012-10-17",
 				"Statement": []interface{}{
