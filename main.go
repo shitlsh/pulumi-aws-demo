@@ -54,10 +54,8 @@ func main() {
 				"Statement": []interface{}{
 					map[string]interface{}{
 						"Effect": "Allow",
-						"Principal": []interface{}{
-							map[string]interface{}{
+						"Principal": map[string]interface{}{
 								"Service": "events.amazonaws.com",
-							},
 						},
 						"Action": "sns:Publish",
 						"Resource": arn,
@@ -67,6 +65,7 @@ func main() {
 			if err != nil {
 				return "", err
 			}
+			fmt.Println(policyJSON)
 			return string(policyJSON), nil
 		}).(pulumi.StringOutput)
 
@@ -116,10 +115,8 @@ func main() {
 				"Statement": []interface{}{
 					map[string]interface{}{
 						"Effect": "Allow",
-						"Principal": []interface{}{
-							map[string]interface{}{
-								"Service": "sns.amazonaws.com",
-							},
+						"Principal": map[string]interface{}{
+							"Service": "sns.amazonaws.com",
 						},
 						"Action": "sqs:SendMessage",
 						"Resource": arn,
