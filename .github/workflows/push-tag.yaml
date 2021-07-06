@@ -25,8 +25,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Diff Lambda Code
+        id: git-diff
+        uses: technote-space/get-diff-action@v4
+        with:
+          PATTERNS: |
+            handler/*
+
       - name: Build, tag, and push image to Amazon ECR
         id: push-ecr
+        if: steps.git-diff.outputs.diff
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: my-ecr-repo
