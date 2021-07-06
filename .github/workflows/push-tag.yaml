@@ -18,9 +18,10 @@ jobs:
           #aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
-      - uses: actions/download-artifact@v2
+      - uses: dawidd6/action-download-artifact@v2
         name: Download Lambda Image Uri
         with:
+          workflow: push-preview.yaml
           name: ecr-image-uri
 
       - name: Set lambdaImage Env
