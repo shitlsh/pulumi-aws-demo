@@ -26,7 +26,7 @@ jobs:
 
       - name: Set lambdaImage Env
         run: |
-          echo "::set-output name=lambdaImage::$(imguri.txt)"
+          echo "::set-output name=lambdaImage::$(<imguri.txt)"
 
       - uses: actions/checkout@v2
         name: Checkout
