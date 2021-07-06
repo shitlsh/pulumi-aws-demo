@@ -25,8 +25,9 @@ jobs:
           name: ecr-image-uri
 
       - name: Set lambdaImage Env
+        id: set-env
         run: |
-          echo "::set-output name=lambdaImage::$(imguri.txt)"
+          echo "::set-output name=lambdaImage::$(<imguri.txt)"
 
       - uses: actions/checkout@v2
         name: Checkout
@@ -39,4 +40,4 @@ jobs:
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           MY_EMAIL_ADDRESS: ${{ secrets.MY_EMAIL_ADDRESS }}
-          IMAGE_URI: ${{ steps.push-ecr.outputs.lambdaImage }}
+          IMAGE_URI: ${{ steps.set-env.outputs.lambdaImage }}
