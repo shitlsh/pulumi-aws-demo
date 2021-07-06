@@ -44,8 +44,23 @@ jobs:
                 aws ecr create-repository --repository-name $ECR_REPOSITORY
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "::set-output name=lambdaImage::${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          mkdir -p to/artifact
+          echo "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" > to/artifact/imguri.txt
         working-directory: ./handler
+
+      - uses: actions/upload-artifact@v2
+        if: steps.git-diff.outputs.diff
+        with:
+          name: ecr-image-uri
+          path: handler/to/artifact/imguri.txt
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: ecr-image-uri
+
+      - name: Set lambdaImage Env
+        run: |
+          echo "::set-output name=lambdaImage::$(imguri.txt)"
 
       - name: deploy pulumi stack to aws
         uses: pulumi/actions@v3
