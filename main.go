@@ -235,14 +235,14 @@ func main() {
 
 		// Create subscriptions for mainSns
 		// Send email
-		//_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-email-sub", &sns2.TopicSubscriptionArgs{
-		//	Topic: mainSns,
-		//	Endpoint: pulumi.String(os.Getenv("MY_EMAIL_ADDRESS")),
-		//	Protocol: pulumi.String("email"),
-		//})
-		//if err != nil {
-		//	return err
-		//}
+		_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-email-sub", &sns2.TopicSubscriptionArgs{
+			Topic: mainSns,
+			Endpoint: pulumi.String(os.Getenv("MY_EMAIL_ADDRESS")),
+			Protocol: pulumi.String("email"),
+		})
+		if err != nil {
+			return err
+		}
 
 		// Trigger lambda
 		_, err = sns2.NewTopicSubscription(ctx,"pulumi-aws-demo-main-sns-lambda-sub", &sns2.TopicSubscriptionArgs{

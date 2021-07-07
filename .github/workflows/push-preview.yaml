@@ -33,7 +33,7 @@ jobs:
 
       - name: Build, tag, and push image to Amazon ECR
         id: push-ecr
-        if: steps.git-diff-lambda.outputs.diff
+        #if: steps.git-diff-lambda.outputs.diff
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: my-ecr-repo
@@ -49,7 +49,7 @@ jobs:
 
       - uses: actions/upload-artifact@v2
         name: Upload Lambda Image Uri
-        if: steps.git-diff-lambda.outputs.diff
+        #if: steps.git-diff-lambda.outputs.diff
         with:
           name: ecr-image-uri
           path: handler/to/artifact/imguri.txt
