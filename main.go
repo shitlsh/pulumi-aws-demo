@@ -32,6 +32,7 @@ func main() {
 		// Create an AWS resource (SNS:Topic)
 		mainSns, err := sns2.NewTopic(ctx,"pulumi-aws-demo-main-sns",&sns2.TopicArgs{
 			Name: pulumi.String("pulumi-aws-demo-main-sns"),
+			KmsMasterKeyId: pulumi.String("alias/aws/sns"),
 			Tags: pulumi.StringMap{"Owner": pulumi.String("awstraining")},
 		})
 		if err != nil {
