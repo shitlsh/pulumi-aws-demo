@@ -30,7 +30,7 @@ func main() {
 					"Sid": "",
 					"Effect": "Allow",
 					"Principal": {
-						"AWS": "*"
+						"Service": "events.amazonaws.com"
 					},
 					"Action": "sts:AssumeRole"
 				}]
