@@ -23,7 +23,7 @@ func main() {
 		}
 
 		// Create KMS
-		cmkRole, err := iam.NewRole(ctx,"pulumi-aws-demo-cmk-role",&iam.RoleArgs{
+		eventRuleRole, err := iam.NewRole(ctx,"pulumi-aws-demo-cmk-role",&iam.RoleArgs{
 			AssumeRolePolicy: pulumi.String(`{
 				"Version": "2012-10-17",
 				"Statement": [{
@@ -79,6 +79,11 @@ func main() {
 						},
 						"Action": "kms:*",
 						"Resource": "*"
+					},
+					{
+						"Effect": "Allow",
+						 "Action": [ "events:InvokeApiDestination" ],
+						"Resource": [ "arn:aws:events:::api-destination/*" ]
 					}
 				]
 			}`,callerIdentity.AccountId,callerIdentity.AccountId,callerIdentity.AccountId)),
@@ -111,7 +116,7 @@ func main() {
 		}).(pulumi.StringOutput)
 
 		_, err = iam.NewRolePolicy(ctx,"pulumi-aws-demo-cmk-role-policy",&iam.RolePolicyArgs{
-			Role: cmkRole.Name,
+			Role: eventRuleRole.Name,
 			Policy: cmkPolicy,
 		})
 
@@ -119,7 +124,7 @@ func main() {
 		scheduleRule, err := cloudwatch.NewEventRule(ctx, "pulumi-aws-demo-schedule-rule", &cloudwatch.EventRuleArgs{
 			Description:  pulumi.String("Trigger pulumi-aws-demo-main-sns every 5 minutes"),
 			ScheduleExpression:  pulumi.String("rate(5 minutes)"),
-			RoleArn: cmkRole.Arn,
+			RoleArn: eventRuleRole.Arn,
 		})
 		if err != nil {
 			return err
@@ -152,7 +157,7 @@ func main() {
 					map[string]interface{}{
 						"Effect": "Allow",
 						"Principal": map[string]interface{}{
-								"AWS": "arn:aws:iam::"+callerIdentity.AccountId+":role/pulumi-aws-demo-cmk-role",
+								"Service": "events.amazonaws.com",
 						},
 						"Action": "sns:Publish",
 						"Resource": arn,
