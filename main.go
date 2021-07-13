@@ -23,25 +23,6 @@ func main() {
 		}
 
 		// Create KMS
-		cmkRole, err := iam.NewRole(ctx,"pulumi-aws-demo-cmk-role",&iam.RoleArgs{
-			AssumeRolePolicy: pulumi.String(`{
-				"Version": "2012-10-17",
-				"Statement": [{
-					"Sid": "",
-					"Effect": "Allow",
-					"Principal": {
-						"Service": "events.amazonaws.com"
-					},
-					"Action": "sts:AssumeRole"
-				}]
-			}`),
-			Description:  pulumi.String("role to use cmk"),
-			Name: pulumi.String("pulumi-aws-demo-cmk-role"),
-		})
-		if err != nil {
-			return err
-		}
-
 		kms, err := kms2.NewKey(ctx,"pulumi-aws-demo-kms-key",&kms2.KeyArgs{
 			Description: pulumi.String("cmk created by pulumi to protect sns & sqs"),
 			Policy: pulumi.String(fmt.Sprintf(`{
@@ -56,6 +37,8 @@ func main() {
 						},
 						"Action": [
 							"kms:Decrypt",
+							"kms:Encrypt",
+							"kms:ReEncrypt*",
 							"kms:GenerateDataKey*",
 							"kms:CreateGrant",
 							"kms:ListGrants",
@@ -66,7 +49,8 @@ func main() {
 							"ArnEquals": {
 								"aws:SourceArn": [
 									"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs",
-									"arn:aws:sns:ap-southeast-2:%s:pulumi-aws-demo-main-sns"
+									"arn:aws:sns:ap-southeast-2:%s:pulumi-aws-demo-main-sns",
+									"arn:aws:events:ap-southeast-2:%s:pulumi-aws-demo-schedule-rule"
 								]
 							}
 						}
@@ -81,45 +65,17 @@ func main() {
 						"Resource": "*"
 					}
 				]
-			}`,callerIdentity.AccountId,callerIdentity.AccountId,callerIdentity.AccountId)),
+			}`,callerIdentity.AccountId,callerIdentity.AccountId,callerIdentity.AccountId,callerIdentity.AccountId)),
 		})
 		if err != nil {
 			return err
 		}
 
-		cmkPolicy := kms.Arn.ApplyT(func (arn string) (string, error) {
-			policyJSON, err := json.Marshal(map[string]interface{}{
-				"Version": "2012-10-17",
-				"Statement": []interface{}{
-					map[string]interface{}{
-						"Effect": "Allow",
-						"Action": []interface{}{
-							"kms:Decrypt",
-							"kms:Encrypt",
-							"kms:ReEncrypt",
-							"kms:GenerateDataKey*",
-							"kms:DescribeKey",
-						},
-						"Resource": arn,
-					},
-				},
-			})
-			if err != nil {
-				return "", err
-			}
-			return string(policyJSON), nil
-		}).(pulumi.StringOutput)
-
-		_, err = iam.NewRolePolicy(ctx,"pulumi-aws-demo-cmk-role-policy",&iam.RolePolicyArgs{
-			Role: cmkRole.Name,
-			Policy: cmkPolicy,
-		})
-
 		// Create a event rule triggers sns topic every 5 minutes
 		scheduleRule, err := cloudwatch.NewEventRule(ctx, "pulumi-aws-demo-schedule-rule", &cloudwatch.EventRuleArgs{
+			Name: pulumi.String("pulumi-aws-demo-schedule-rule"),
 			Description:  pulumi.String("Trigger pulumi-aws-demo-main-sns every 5 minutes"),
 			ScheduleExpression:  pulumi.String("rate(5 minutes)"),
-			RoleArn: cmkRole.Arn,
 		})
 		if err != nil {
 			return err
@@ -152,7 +108,7 @@ func main() {
 					map[string]interface{}{
 						"Effect": "Allow",
 						"Principal": map[string]interface{}{
-								"AWS": "arn:aws:iam::"+callerIdentity.AccountId+":role/pulumi-aws-demo-cmk-role",
+								"Service": "events.amazonaws.com",
 						},
 						"Action": "sns:Publish",
 						"Resource": arn,
