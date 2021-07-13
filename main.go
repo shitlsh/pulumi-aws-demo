@@ -21,51 +21,96 @@ func main() {
 		if err != nil {
 			return err
 		}
-		// Create a event rule triggers sns topic every 5 minutes
-		eventRole, err := iam.NewRole(ctx,"pulumi-aws-demo-event-rule-role",&iam.RoleArgs{
+
+		// Create KMS
+		cmkRole, err := iam.NewRole(ctx,"pulumi-aws-demo-cmk-role",&iam.RoleArgs{
 			AssumeRolePolicy: pulumi.String(`{
 				"Version": "2012-10-17",
 				"Statement": [{
 					"Sid": "",
 					"Effect": "Allow",
 					"Principal": {
-						"Service": "events.amazonaws.com"
+						"AWS": "*"
 					},
 					"Action": "sts:AssumeRole"
 				}]
 			}`),
-			Description:  pulumi.String("event rule role"),
-			Name: pulumi.String("pulumi-aws-demo-event-rule-role"),
+			Description:  pulumi.String("role to use cmk"),
+			Name: pulumi.String("pulumi-aws-demo-cmk-role"),
 		})
 		if err != nil {
 			return err
 		}
 
+		kms, err := kms2.NewKey(ctx,"pulumi-aws-demo-kms-key",&kms2.KeyArgs{
+			Description: pulumi.String("cmk created by pulumi to protect sns & sqs"),
+			Policy: pulumi.String(fmt.Sprintf(`{
+				"Version": "2012-10-17",
+				"Id": "default-sns-1",
+				"Statement": [
+					{
+						"Sid": "Allow access through SNS for all principals in the account that are authorized to use SNS",
+						"Effect": "Allow",
+						"Principal": {
+							"AWS": "*"
+						},
+						"Action": [
+							"kms:Decrypt",
+							"kms:GenerateDataKey*",
+							"kms:CreateGrant",
+							"kms:ListGrants",
+							"kms:DescribeKey"
+						],
+						"Resource": "*",
+						"Condition": {
+							"ArnEquals": {
+								"aws:SourceArn": [
+									"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs",
+									"arn:aws:sns:ap-southeast-2:%s:pulumi-aws-demo-main-sns"
+								]
+							}
+						}
+					}
+				]
+			}`,callerIdentity.AccountId,callerIdentity.AccountId)),
+		})
+		if err != nil {
+			return err
+		}
+
+		cmkPolicy := kms.Arn.ApplyT(func (arn string) (string, error) {
+			policyJSON, err := json.Marshal(map[string]interface{}{
+				"Version": "2012-10-17",
+				"Statement": []interface{}{
+					map[string]interface{}{
+						"Effect": "Allow",
+						"Action": []interface{}{
+							"kms:Decrypt",
+							"kms:Encrypt",
+							"kms:ReEncrypt",
+							"kms:GenerateDataKey*",
+							"kms:DescribeKey",
+						},
+						"Resource": arn,
+					},
+				},
+			})
+			if err != nil {
+				return "", err
+			}
+			return string(policyJSON), nil
+		}).(pulumi.StringOutput)
+
+		_, err = iam.NewRolePolicy(ctx,"pulumi-aws-demo-cmk-role-policy",&iam.RolePolicyArgs{
+			Role: cmkRole.Name,
+			Policy: cmkPolicy,
+		})
+
+		// Create a event rule triggers sns topic every 5 minutes
 		scheduleRule, err := cloudwatch.NewEventRule(ctx, "pulumi-aws-demo-schedule-rule", &cloudwatch.EventRuleArgs{
 			Description:  pulumi.String("Trigger pulumi-aws-demo-main-sns every 5 minutes"),
 			ScheduleExpression:  pulumi.String("rate(5 minutes)"),
-			RoleArn: eventRole.Arn,
-		})
-		if err != nil {
-			return err
-		}
-
-		// Create KMS
-		kms, err := kms2.NewKey(ctx,"pulumi-aws-demo-kms-key",&kms2.KeyArgs{
-			Description: pulumi.String("cmk created by pulumi to protect sns & sqs"),
-		})
-		if err != nil {
-			return err
-		}
-
-		_, err = kms2.NewGrant(ctx,"pulumi-aws-demo-kms-key-grant",&kms2.GrantArgs{
-			KeyId: kms.KeyId,
-			GranteePrincipal: eventRole.Arn,
-			Operations: pulumi.StringArray{
-				pulumi.String("Encrypt"),
-				pulumi.String("Decrypt"),
-				pulumi.String("GenerateDataKey"),
-			},
+			RoleArn: cmkRole.Arn,
 		})
 		if err != nil {
 			return err
@@ -108,7 +153,6 @@ func main() {
 			if err != nil {
 				return "", err
 			}
-			fmt.Println(policyJSON)
 			return string(policyJSON), nil
 		}).(pulumi.StringOutput)
 
