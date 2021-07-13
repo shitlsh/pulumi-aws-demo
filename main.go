@@ -6,6 +6,7 @@ import (
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/cloudwatch"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/iam"
+	kms2 "github.com/pulumi/pulumi-aws/sdk/v4/go/aws/kms"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/lambda"
 	sns2 "github.com/pulumi/pulumi-aws/sdk/v4/go/aws/sns"
 	"github.com/pulumi/pulumi-aws/sdk/v4/go/aws/sqs"
@@ -29,10 +30,31 @@ func main() {
 			return err
 		}
 
+		// Create KMS
+		kms, err := kms2.NewKey(ctx,"pulumi-aws-demo-kms-key",&kms2.KeyArgs{
+			Description: pulumi.String("cmk created by pulumi to protect sns & sqs"),
+		})
+		if err != nil {
+			return err
+		}
+
+		_, err = kms2.NewGrant(ctx,"pulumi-aws-demo-kms-key-grant",&kms2.GrantArgs{
+			KeyId: kms.KeyId,
+			GranteePrincipal: scheduleRule.Arn,
+			Operations: pulumi.StringArray{
+				pulumi.String("Encrypt"),
+				pulumi.String("Decrypt"),
+				pulumi.String("GenerateDataKey"),
+			},
+		})
+		if err != nil {
+			return err
+		}
+
 		// Create an AWS resource (SNS:Topic)
 		mainSns, err := sns2.NewTopic(ctx,"pulumi-aws-demo-main-sns",&sns2.TopicArgs{
 			Name: pulumi.String("pulumi-aws-demo-main-sns"),
-			KmsMasterKeyId: pulumi.String("alias/aws/sns"),
+			KmsMasterKeyId: kms.KeyId,
 			Tags: pulumi.StringMap{"Owner": pulumi.String("awstraining")},
 		})
 		if err != nil {
