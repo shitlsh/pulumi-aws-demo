@@ -70,9 +70,18 @@ func main() {
 								]
 							}
 						}
+					},
+					{
+						"Sid": "Allow direct access to key metadata to the account",
+						"Effect": "Allow",
+						"Principal": {
+							"AWS": "arn:aws:iam::%s:root"
+						},
+						"Action": "kms:*",
+						"Resource": "*"
 					}
 				]
-			}`,callerIdentity.AccountId,callerIdentity.AccountId)),
+			}`,callerIdentity.AccountId,callerIdentity.AccountId,callerIdentity.AccountId)),
 		})
 		if err != nil {
 			return err
