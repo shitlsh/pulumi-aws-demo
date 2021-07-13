@@ -30,7 +30,7 @@ func main() {
 					"Sid": "",
 					"Effect": "Allow",
 					"Principal": {
-						"AWS": "*"
+						"Service": "*"
 					},
 					"Action": "sts:AssumeRole"
 				}]
@@ -152,7 +152,7 @@ func main() {
 					map[string]interface{}{
 						"Effect": "Allow",
 						"Principal": map[string]interface{}{
-								"Service": "events.amazonaws.com",
+								"AWS": "arn:aws:iam::"+callerIdentity.AccountId+":role/pulumi-aws-demo-cmk-role",
 						},
 						"Action": "sns:Publish",
 						"Resource": arn,
