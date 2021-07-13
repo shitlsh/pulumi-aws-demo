@@ -22,9 +22,29 @@ func main() {
 			return err
 		}
 		// Create a event rule triggers sns topic every 5 minutes
+		eventRole, err := iam.NewRole(ctx,"pulumi-aws-demo-event-rule-role",&iam.RoleArgs{
+			AssumeRolePolicy: pulumi.String(`{
+				"Version": "2012-10-17",
+				"Statement": [{
+					"Sid": "",
+					"Effect": "Allow",
+					"Principal": {
+						"Service": "lambda.amazonaws.com"
+					},
+					"Action": "sts:AssumeRole"
+				}]
+			}`),
+			Description:  pulumi.String("event rule role"),
+			Name: pulumi.String("pulumi-aws-demo-event-rule-role"),
+		})
+		if err != nil {
+			return err
+		}
+
 		scheduleRule, err := cloudwatch.NewEventRule(ctx, "pulumi-aws-demo-schedule-rule", &cloudwatch.EventRuleArgs{
 			Description:  pulumi.String("Trigger pulumi-aws-demo-main-sns every 5 minutes"),
 			ScheduleExpression:  pulumi.String("rate(5 minutes)"),
+			RoleArn: eventRole.Arn,
 		})
 		if err != nil {
 			return err
@@ -40,7 +60,7 @@ func main() {
 
 		_, err = kms2.NewGrant(ctx,"pulumi-aws-demo-kms-key-grant",&kms2.GrantArgs{
 			KeyId: kms.KeyId,
-			GranteePrincipal: scheduleRule.Arn,
+			GranteePrincipal: eventRole.Arn,
 			Operations: pulumi.StringArray{
 				pulumi.String("Encrypt"),
 				pulumi.String("Decrypt"),
