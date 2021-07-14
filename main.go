@@ -30,10 +30,14 @@ func main() {
 				"Id": "default-sns-1",
 				"Statement": [
 					{
-						"Sid": "Allow access through SNS for all principals in the account that are authorized to use SNS",
+						"Sid": "Allow Services to use CMK",
 						"Effect": "Allow",
 						"Principal": {
-							"AWS": "*"
+							"Service": [
+								"events.amazonaws.com",
+								"sns.amazonaws.com",
+								"sqs.amazonaws.com"
+							]
 						},
 						"Action": [
 							"kms:Decrypt",
@@ -44,16 +48,7 @@ func main() {
 							"kms:ListGrants",
 							"kms:DescribeKey"
 						],
-						"Resource": "*",
-						"Condition": {
-							"ArnEquals": {
-								"aws:SourceArn": [
-									"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs",
-									"arn:aws:sns:ap-southeast-2:%s:pulumi-aws-demo-main-sns",
-									"arn:aws:events:ap-southeast-2:%s:pulumi-aws-demo-schedule-rule"
-								]
-							}
-						}
+						"Resource": "*"
 					},
 					{
 						"Sid": "Allow direct access to key metadata to the account",
@@ -65,7 +60,7 @@ func main() {
 						"Resource": "*"
 					}
 				]
-			}`,callerIdentity.AccountId,callerIdentity.AccountId,callerIdentity.AccountId,callerIdentity.AccountId)),
+			}`,callerIdentity.AccountId)),
 		})
 		if err != nil {
 			return err
