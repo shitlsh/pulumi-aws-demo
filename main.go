@@ -33,7 +33,7 @@ func main() {
 						"Sid": "Allow access through SNS for all principals in the account that are authorized to use SNS",
 						"Effect": "Allow",
 						"Principal": {
-							"AWS": "*"
+							"Service": "*"
 						},
 						"Action": [
 							"kms:Decrypt",
@@ -44,16 +44,11 @@ func main() {
 							"kms:ListGrants",
 							"kms:DescribeKey"
 						],
-						"Resource": "*",
-						"Condition": {
-							"ArnEquals": {
-								"aws:SourceArn": [
-									"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs",
-									"arn:aws:sns:ap-southeast-2:%s:pulumi-aws-demo-main-sns",
-									"arn:aws:events:ap-southeast-2:%s:pulumi-aws-demo-schedule-rule"
-								]
-							}
-						}
+						"Resource": [
+							"arn:aws:sqs:ap-southeast-2:%s:pulumi-aws-demo-sqs",
+							"arn:aws:sns:ap-southeast-2:%s:pulumi-aws-demo-main-sns",
+							"arn:aws:events:ap-southeast-2:%s:pulumi-aws-demo-schedule-rule"
+						]
 					},
 					{
 						"Sid": "Allow direct access to key metadata to the account",
