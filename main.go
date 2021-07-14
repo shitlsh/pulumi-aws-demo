@@ -35,8 +35,7 @@ func main() {
 						"Principal": {
 							"Service": [
 								"events.amazonaws.com",
-								"sns.amazonaws.com",
-								"sqs.amazonaws.com"
+								"sns.amazonaws.com"
 							]
 						},
 						"Action": [
@@ -306,10 +305,29 @@ func main() {
 			Topic:    mainSns,
 			Endpoint: queue.Arn,
 			Protocol: pulumi.String("sqs"),
+			FilterPolicy: pulumi.String(`
+			{
+			   "event": ["example_event"],
+			   "number": [{"numeric": [">=", 100]}]
+			}
+			`),
 		})
 		if err != nil {
 			return err
 		}
+
+		// Create DLQ Alarm
+		_, err = cloudwatch.NewMetricAlarm(ctx,"pulumi-aws-demo-sqs-dead-letter-alarm",&cloudwatch.MetricAlarmArgs{
+			AlarmDescription:                  pulumi.String("Alarm when DLQ has message"),
+			ComparisonOperator:                pulumi.String("GreaterThanOrEqualToThreshold"),
+			Dimensions:                        pulumi.StringMap{"QueueName" : pulumi.String("pulumi-aws-demo-sqs-dead-letter")},
+			EvaluationPeriods:                 pulumi.Int(1),
+			MetricName:                        pulumi.String("ApproximateNumberOfMessagesVisible"),
+			Namespace:                         pulumi.String("AWS/SQS"),
+			Period:                            pulumi.Int(600),
+			Statistic:                         pulumi.String("Sum"),
+			Threshold:                         pulumi.Float64(1),
+		})
 
 		return nil
 	})
